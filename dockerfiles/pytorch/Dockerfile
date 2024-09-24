@@ -35,14 +35,15 @@ RUN apt-get update && \
 
 # Copying only necessary files as filtered by .dockerignore
 COPY . .
+RUN pip install uv
 
 # copy application
 COPY src/huggingface_inference_toolkit huggingface_inference_toolkit
 COPY src/huggingface_inference_toolkit/webservice_starlette.py webservice_starlette.py
+COPY fast-unidic /usr/local/lib/python3.10/dist-packages/unidic/dicdir/
 
-RUN pip install -r speech-to-speech/requirements.txt
-RUN python3 -m unidic download  # for melo
-RUN pip install flash-attn --no-build-isolation
+RUN uv pip install -r speech-to-speech/requirements.txt --system
+RUN uv pip install flash-attn --no-build-isolation --system
 
 # copy entrypoint and change permissions
 COPY --chmod=0755  scripts/entrypoint.sh entrypoint.sh
