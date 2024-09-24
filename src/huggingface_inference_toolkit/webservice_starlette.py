@@ -17,6 +17,7 @@ from huggingface_inference_toolkit.serialization.json_utils import Jsoner
 from huggingface_inference_toolkit.utils import (
     convert_params_to_int_or_bool,
 )
+import asyncio
 
 import sys
 sys.path.append('speech-to-speech')
