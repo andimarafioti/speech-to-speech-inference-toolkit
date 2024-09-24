@@ -6,6 +6,9 @@ import orjson
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
+from starlette.endpoints import WebSocketEndpoint
+from starlette.websockets import WebSocket
+from starlette.routing import WebSocketRoute
 
 from huggingface_inference_toolkit.async_utils import async_handler_call
 from huggingface_inference_toolkit.logging import logger
@@ -22,6 +25,7 @@ from s2s_handler import EndpointHandler
 async def prepare_handler():
     global inference_handler
     inference_handler = EndpointHandler()
+    inference_handler.pipeline_manager.start()
     logger.info("Model initialized successfully")
 
 async def health(request):
@@ -75,33 +79,30 @@ async def predict(request):
         )
 
 
-# Create app based on which cloud environment is used
-if os.getenv("AIP_MODE", None) == "PREDICTION":
-    logger.info("Running in Vertex AI environment")
-    # extract routes from environment variables
-    _predict_route = os.getenv("AIP_PREDICT_ROUTE", None)
-    _health_route = os.getenv("AIP_HEALTH_ROUTE", None)
-    if _predict_route is None or _health_route is None:
-        raise ValueError(
-            "AIP_PREDICT_ROUTE and AIP_HEALTH_ROUTE need to be set in Vertex AI environment"
-        )
+class WebSocketPredictEndpoint(WebSocketEndpoint):
+    encoding = "bytes"
 
-    app = Starlette(
-        debug=False,
-        routes=[
-            Route(_health_route, health, methods=["GET"]),
-            Route(_predict_route, predict, methods=["POST"]),
-        ],
-        on_startup=[prepare_handler],
-    )
-else:
-    app = Starlette(
-        debug=False,
-        routes=[
-            Route("/", health, methods=["GET"]),
-            Route("/health", health, methods=["GET"]),
-            Route("/", predict, methods=["POST"]),
-            Route("/predict", predict, methods=["POST"]),
-        ],
-        on_startup=[prepare_handler],
-    )
+    async def on_connect(self, websocket):
+        await websocket.accept()
+
+    async def on_receive(self, websocket, data):
+        # Run the handler's processing in a separate thread to avoid blocking
+        loop = asyncio.get_event_loop()
+        response_data = await loop.run_in_executor(None, inference_handler.process_streaming_data, data)
+        if response_data:
+            await websocket.send_bytes(response_data)
+
+    async def on_disconnect(self, websocket, close_code):
+        pass
+
+app = Starlette(
+    debug=True,
+    routes=[
+        Route("/", health, methods=["GET"]),
+        Route("/health", health, methods=["GET"]),
+        Route("/", predict, methods=["POST"]),
+        Route("/predict", predict, methods=["POST"]),
+        WebSocketRoute("/ws", WebSocketPredictEndpoint)
+    ],
+    on_startup=[prepare_handler],
+)
