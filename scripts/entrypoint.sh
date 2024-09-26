@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the default port
-PORT=5000
+PORT=80  # 80 is the default port for inference endpoints
 
 # Check if AIP_MODE is set and adjust the port for Vertex AI
 if [[ ! -z "${AIP_MODE}" ]]; then
