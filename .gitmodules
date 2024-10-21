@@ -1,0 +1,6 @@
+[submodule "speech-to-speech"]
+	path = speech-to-speech
+	url = https://github.com/huggingface/speech-to-speech
+[submodule "fast-unidic"]
+	path = fast-unidic
+	url = https://huggingface.co/andito/fast-unidic
